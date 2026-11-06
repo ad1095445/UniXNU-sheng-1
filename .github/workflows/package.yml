@@ -97,6 +97,20 @@ jobs:
             UniXNU/out/sheng/ipados-27.0.1-24A446/sheng_ipados27/runtime/data.dbr
             UniXNU/out/sheng/ipados-27.0.1-24A446/sheng_ipados27/runtime/inputs.json
           key: ${{ steps.seed-key.outputs.key }}-${{ inputs.os }}
+      - name: Read original seed from private inputs
+        if: inputs.os == '27'
+        uses: actions/checkout@v4
+        with:
+          repository: ad1095445/sheng-build-inputs
+          path: original-seed-inputs
+          ssh-key: ${{ secrets.ORIGINAL_SEED_SSH_KEY }}
+          persist-credentials: false
+      - name: Stage original installation seed
+        if: inputs.os == '27'
+        run: |
+          echo 'e424b29026049874e827983e5763c63b5f35c9066cb6f992bc9f10658fec91e0  original-seed-inputs/data.dbr' | shasum -a 256 -c -
+          mkdir -p UniXNU/out/sheng/ipados-27.0.1-24A446/sheng_ipados27/runtime
+          cp original-seed-inputs/data.dbr UniXNU/out/sheng/ipados-27.0.1-24A446/sheng_ipados27/runtime/data.dbr
       - name: prepare preserved Data seed
         if: inputs.os == '27'
         env:
