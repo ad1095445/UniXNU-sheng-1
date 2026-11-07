@@ -1,0 +1,117 @@
+diff --git a/board.toml b/board.toml
+index 9b64153..cfd9e56 100644
+--- a/board.toml
++++ b/board.toml
+@@ -57,7 +57,7 @@
+ "dram_size" = "0x80000000"
+ "skip_setup_tool" = "scripts/seed-data-skip-setup.py"
+ "panic_screen" = true
+-"kernel_args" = ["-v", "serial=3", "debug=0x14e", "kt_fixed_zones=120", "-no_slto_panic", "use_contiguous_hint=0", "native-source-storage=1", "native-ufs-root=1", "offline-mobile-graphics-load=1", "offline-mobile-graphics-client=1", "offline-legacy-register=1", "offline-legacy-gop=1", "offline-legacy-unit-scale=2", "offline-legacy-pm=1", "offline-legacy-validate=1", "offline-legacy-transfer=1", "offline-legacy-cpu-present=1", "offline-legacy-phase=4", "offline-key-events=1", "sheng-aks=1", "offline-hid-input=1", "offline-hid-home=1", "sheng-touch=4", "sheng-touch-hid=1", "sheng-buttons=1", "sheng-log=1", "sheng-smp=1", "armcpu-spi-ipi=1", "armcpu-self-ipi=1", "sheng-data-persist=2", "sheng-adsp=2", "sheng-audio=12", "sheng-wifi=5", "sheng-bluetooth=1", "sheng-backlight=1", "sheng-cpufreq=4", "sheng-gpu-power=9", "sheng-gpu-metal=1", "sheng-fb-gpu=1", "sheng-fb-bgra=1", "sheng-dpu-scanout=2", "sheng-no-lc=1", "sheng-vsync=120", "sheng-vsync-fixed=1", "sheng-gpu-dcvs=1", "sheng-disable-watchdogd=1", "sheng-lite=1", "sheng-gpu-addon=1"]
++"kernel_args" = ["-v", "serial=3", "debug=0x14e", "kt_fixed_zones=120", "-no_slto_panic", "use_contiguous_hint=0", "native-source-storage=1", "native-ufs-root=1", "offline-mobile-graphics-load=1", "offline-mobile-graphics-client=1", "offline-legacy-register=1", "offline-legacy-gop=1", "offline-legacy-unit-scale=2", "offline-legacy-pm=1", "offline-legacy-validate=1", "offline-legacy-transfer=1", "offline-legacy-cpu-present=1", "offline-legacy-phase=4", "offline-key-events=1", "sheng-aks=1", "offline-hid-input=1", "offline-hid-home=1", "sheng-touch=4", "sheng-touch-hid=1", "sheng-buttons=1", "sheng-log=1", "sheng-smp=1", "armcpu-spi-ipi=1", "armcpu-self-ipi=1", "sheng-data-persist=2", "sheng-adsp=2", "sheng-audio=12", "sheng-wifi=5", "sheng-backlight=1", "sheng-cpufreq=4", "sheng-gpu-power=9", "sheng-gpu-metal=1", "sheng-fb-gpu=1", "sheng-fb-bgra=1", "sheng-dpu-scanout=2", "sheng-no-lc=1", "sheng-vsync=120", "sheng-vsync-fixed=1", "sheng-gpu-dcvs=1", "sheng-disable-watchdogd=1", "sheng-lite=1", "sheng-gpu-addon=1"]
+ 
+ [payload.runtime]
+ tool = "scripts/build-boot-runtime.py"
+@@ -200,3 +200,7 @@ CI_ENABLE_METAL_GPU = "0"
+ 
+ ["os_overrides"."ipados-26.5.2-23F84"]
+ "remove" = ["payload.install", "payload.root_policies", "payload.runtime"]
++
++# sheng's ABL rejects boot header v0 (Load Error); v4 forbids a ramdisk. v3 it is.
++["bootimg"."image"]
++"header_version" = 3
+diff --git a/package/AppsSmmuLock.h b/package/AppsSmmuLock.h
+index e3868d4..6df49fb 100644
+--- a/package/AppsSmmuLock.h
++++ b/package/AppsSmmuLock.h
+@@ -1,8 +1,9 @@
+ /* SPDX-License-Identifier: BSD-2-Clause-Patent */
+ #ifndef SHENG_APPS_SMMU_LOCK_H
+ #define SHENG_APPS_SMMU_LOCK_H
+-extern "C" bool sm8550_apps_smmu_lock(void) __attribute__((weak_import));
+-extern "C" void sm8550_apps_smmu_unlock(void) __attribute__((weak_import));
++// LOCAL: pinned platform lacks this optional API; retain the existing fallback.
++static constexpr bool (*sm8550_apps_smmu_lock)(void) = nullptr;
++static constexpr void (*sm8550_apps_smmu_unlock)(void) = nullptr;
+ class AppsSmmuLock {
+     bool held;
+ public:
+diff --git a/package/AudioProbe.cpp b/package/AudioProbe.cpp
+index 11d7019..3e9f82c 100644
+--- a/package/AudioProbe.cpp
++++ b/package/AudioProbe.cpp
+@@ -42,7 +42,8 @@ extern "C" {
+ extern kmod_info_t g_kernel_kmod_info;
+ extern "C" void native_audio_service_static_init(void) __asm__("__GLOBAL__sub_I_ShengAudioService.cpp");
+ extern "C" void sheng_audio_service_start(void);
+-extern "C" bool sm8550_gcc_update32(volatile uint32_t *,uint32_t,uint32_t) __attribute__((weak_import));
++// LOCAL: pinned platform lacks this optional API; retain the existing fallback.
++static constexpr bool (*sm8550_gcc_update32)(volatile uint32_t *,uint32_t,uint32_t) = nullptr;
+ 
+ extern "C" ShengAdspChannel *sheng_adsp_channel(const char *, uint32_t, uint32_t, int, const ShengAdspClient *, void *) __attribute__((weak_import));
+ extern "C" int sheng_adsp_send(ShengAdspChannel *, const void *, uint32_t) __attribute__((weak_import));
+diff --git a/package/LegacyDisplayProbe.cpp b/package/LegacyDisplayProbe.cpp
+index ab08c15..1bf458b 100644
+--- a/package/LegacyDisplayProbe.cpp
++++ b/package/LegacyDisplayProbe.cpp
+@@ -501,7 +501,8 @@ extern void native_touch_probe(void);
+ extern void sheng_cpufreq_probe(void);
+ extern void sheng_gpu_power_probe(void);
+ extern void sheng_wifi_probe(void);
+-extern void sheng_bluetooth_probe(void) __attribute__((weak_import));
++// LOCAL: pinned platform lacks this optional API; retain the existing fallback.
++static constexpr void (*sheng_bluetooth_probe)(void) = nullptr;
+ extern void sheng_adsp_probe(void);
+ extern void sheng_battery_probe(void);
+ extern void sheng_audio_probe(void);
+diff --git a/package/TouchProbe.cpp b/package/TouchProbe.cpp
+index 9ec3a3b..e21054a 100644
+--- a/package/TouchProbe.cpp
++++ b/package/TouchProbe.cpp
+@@ -506,7 +506,8 @@ bool configureClock(Session &s, unsigned hz) {
+ // target, 3 = the application processor), +0xc INTR_STATUS (bit 0; acknowledged by writing 0, the sm8550 groups set no intr_ack_high). All TLMM
+ // pin interrupts share the summary SPI 208 (sm8550.dtsi tlmm interrupts, level high), INTID 240.
+ extern "C" int armcpu_spi_attach(uint32_t, bool, void (*)(void *), void *, uint32_t *, uint64_t *) __attribute__((weak_import));
+-extern "C" int armcpu_spi_share(uint32_t, void (*)(void *), void *) __attribute__((weak_import));
++// LOCAL: pinned platform lacks this optional API; retain the existing fallback.
++static constexpr int (*armcpu_spi_share)(uint32_t, void (*)(void *), void *) = nullptr;
+ extern "C" {volatile uint32_t native_touch_irq_stats[4];}   // [0] 0 not armed, 1 armed, 2 attach failed, [1] interrupts, [2] spurious, [3] attach status
+ static volatile uint32_t gTouchIrqEvents;
+ static volatile uint32_t *gTouchPin;
+diff --git a/scripts/build-gop-legacy-display-27.py b/scripts/build-gop-legacy-display-27.py
+index c314eb9..d4b89a6 100644
+--- a/scripts/build-gop-legacy-display-27.py
++++ b/scripts/build-gop-legacy-display-27.py
+@@ -482,7 +482,8 @@ BLUETOOTH = Path(os.environ.get('QCA_BLUETOOTH_DIR') or
+ require((BLUETOOTH / 'include/qbt.h').exists(), 'QcaBluetooth module directory')
+ board_objects = []
+ for stem, extra in [('CpuFreqProbe', ()), ('WifiProbe', ('-I', str(WIFI / 'include'))),
+-                    ('BluetoothProbe', ('-I', str(BLUETOOTH / 'include'), '-I', str(ROOT / 'kits/Sm8550Platform'))),
++                    # LOCAL: BluetoothProbe needs kits/Sm8550Platform/{Sm8550GeniUart,Sm8550Gcc,Sm8550QupDma},
++                    # absent from UniXNU-sm8550-common@a9f45dc; re-enable when the SoC kit publishes them.
+                     ('AdspProbe', ()), ('AudioProbe', ()),
+                     ('BacklightProbe', ()), ('DisplayTimingProbe', ()), ('BatteryProbe', ()),
+                     # GPU power, GMU and the Metal accelerator publication (sheng-gpu-power, sheng-gpu-metal), as on iPadOS 17.
+@@ -504,8 +505,7 @@ compile_c(KITS / 'AdspFirmware.c', board_dir / 'AdspFirmware.o', 'bsd/DEVELOPMEN
+ board_objects.append(board_dir / 'AdspFirmware.o')
+ board_objects += [Path(line.split(' ', 1)[1]) for line in run(['python3', ROOT / 'scripts/build-ath12k-wifi.py', WIFI, board_dir / 'ath12k-wifi'],
+                                                                     text=True).splitlines() if line.startswith('OBJ ')]
+-board_objects += [Path(line.split(' ', 1)[1]) for line in run(['python3', ROOT / 'scripts/build-qca-bluetooth.py', BLUETOOTH,
+-    board_dir / 'qca-bluetooth', '--tree', ROOT], text=True).splitlines() if line.startswith('OBJ ')]
++# LOCAL: the QcaBluetooth SM8550 transport objects need the same missing SoC kit files; skipped with BluetoothProbe.
+ input_objects += board_objects
+ print(f'Board drivers: {len(board_objects)} objects')
+ archive = OUT / 'libNativeLegacyDisplay.late.a'
+@@ -517,12 +517,7 @@ sources = [ROOT / 'drivers/GopFramebuffer/NativeLegacyDisplay.cpp', ROOT / 'driv
+            ROOT / 'drivers/GopFramebuffer/NativeHalfCodes.h', source,
+            ROOT / 'scripts' / ABI_PATH.name, keystore_source, ROOT / 'drivers/AppleKeyStoreState/NativeKeyStoreEvents.cpp',
+            ROOT / 'scripts/hid-device-24A446.json', hid_probe]
+-sources += [KITS / name for name in ('BluetoothProbe.cpp', 'BluetoothFirmware.h', 'WcnPower.h')]
+-sources += [ROOT / 'scripts/build-qca-bluetooth.py', BLUETOOTH / 'tools/source-lock.json']
+-sources += [Path(name) for name in json.loads((board_dir / 'qca-bluetooth/report.json').read_text())['source']]
+-for directory in ('include', 'src', 'shim', 'out/linux'):
+-    sources += sorted((BLUETOOTH / directory).rglob('*.h'))
+-sources += [ROOT / 'kits/Sm8550Platform' / name for name in ('Sm8550GeniUart.h', 'Sm8550QupDma.h')]
++# LOCAL: Bluetooth is disabled until the pinned platform kit includes its transport.
+ sources += [KITS / name for name in ('SmmuBypass.h', 'AppsSmmuLock.h')]
+ 
+ 
