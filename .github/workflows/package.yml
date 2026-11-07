@@ -187,6 +187,20 @@ jobs:
           PYTHON
           bash device/drivers/Ath12kWifi/tools/fetch-sources.sh
           python3 device/drivers/Ath12kWifi/tools/prepare-supplicant.py
+      - name: Backport reference kernel cache hook fix
+        if: inputs.os == '27'
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+
+          script = Path("UniXNU/scripts/build-fileset-release-reference.py")
+          source = script.read_text()
+          old = "|boot_log_rounds))"
+          new = "|boot_log_rounds|boot_cache_input_capture))"
+          if source.count(old) != 1:
+              raise SystemExit("Unexpected reference kernel stub matcher")
+          script.write_text(source.replace(old, new))
+          PYTHON
       - name: package
         working-directory: device
         env:
@@ -200,6 +214,15 @@ jobs:
             args+=(--init-data)
           fi
           scripts/package.sh "${args[@]}"
+      - name: Show reference kernel link errors
+        if: failure()
+        run: |
+          find UniXNU/out/sheng -path '*/fileset-reference/*/lto-build.log' -exec sh -c '
+            for log do
+              echo "$log"
+              tail -60 "$log"
+            done
+          ' sh {} +
       - uses: actions/cache/save@v4
         if: always() && inputs.os == '27' && steps.data-cache.outputs.cache-hit != 'true' && hashFiles('UniXNU/out/sheng/ipados-27.0.1-24A446/sheng_ipados27/runtime/data.dbr') != ''
         with:
