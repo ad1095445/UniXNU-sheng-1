@@ -149,6 +149,28 @@ jobs:
           elif lines[1] != "new file mode 100644\n":
               raise SystemExit("Unexpected Mesa diagnostics patch header")
           PYTHON
+      - name: Prepare sheng firmware and compatibility inputs
+        run: |
+          git -C device apply .github/sheng-build-compat.patch
+          python3 - <<'PYTHON'
+          import hashlib
+          import json
+          from pathlib import Path
+          import subprocess
+
+          directory = Path("device/firmware/wcn7850")
+          manifest = json.loads((directory / "manifest.json").read_text())["files"]
+          base = "https://gitlab.com/kernel-firmware/linux-firmware/-/raw/main/ath12k/WCN7850/hw2.0/"
+          for name, expected in manifest.items():
+              path = directory / name
+              subprocess.run(["curl", "--fail", "--silent", "--show-error", "--location",
+                              "--retry", "4", "--max-time", "120", base + name, "-o", str(path)],
+                             check=True)
+              content = path.read_bytes()
+              if len(content) != expected["bytes"] or hashlib.sha256(content).hexdigest() != expected["sha256"]:
+                  raise SystemExit(f"Unexpected firmware contents: {name}")
+              print(f"Verified WCN7850 firmware: {name}")
+          PYTHON
       - name: package
         working-directory: device
         env:
