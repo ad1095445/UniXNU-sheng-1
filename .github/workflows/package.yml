@@ -136,6 +136,19 @@ jobs:
           if not path.is_file() and os.environ['INIT_DATA'] != 'true':
               raise SystemExit('No saved seed. Supply the ORIGINAL seed for an existing installation, or select init_data for a FIRST installation')
           PY
+      - name: Fix Mesa new-file patch metadata
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+
+          patch = Path("UniXNU/patches/mesa/turnip-frame-diagnostics.patch")
+          lines = patch.read_text().splitlines(keepends=True)
+          if lines[1] == "--- /dev/null\n":
+              lines.insert(1, "new file mode 100644\n")
+              patch.write_text("".join(lines))
+          elif lines[1] != "new file mode 100644\n":
+              raise SystemExit("Unexpected Mesa diagnostics patch header")
+          PYTHON
       - name: package
         working-directory: device
         env:
