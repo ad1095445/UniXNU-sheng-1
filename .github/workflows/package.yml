@@ -171,6 +171,11 @@ jobs:
                   raise SystemExit(f"Unexpected firmware contents: {name}")
               print(f"Verified WCN7850 firmware: {name}")
           PYTHON
+      - name: Prepare locked Wi-Fi sources
+        if: inputs.os == '27'
+        run: |
+          bash device/drivers/Ath12kWifi/tools/fetch-sources.sh
+          python3 device/drivers/Ath12kWifi/tools/prepare-supplicant.py
       - name: package
         working-directory: device
         env:
